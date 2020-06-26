@@ -1,0 +1,38 @@
+Arduino IDE Setup:
+
+  File->Preferences->Additional Boards Manager URLs: 
+  *  https://arduino.esp8266.com/stable/package_esp8266com_index.json
+  *  Be sure to install v2.4.2 to avoid issue: https://github.com/esp8266/Arduino/issues/5787
+
+  Install Libraries:
+  *  Adafruit Unified Sensor
+  *  DHT sensor library
+  *  Adafruit IO Arduino
+
+-------------------------------------------------------------
+
+Or build / upload directly from the command line:
+
+  Install arduino-cli:
+  *  curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=~/bin sh
+
+  Configure arduino-cli:
+  *  arduino-cli config init
+  *  edit ~/.arduino15/arduino-cli.yaml and replace the board_manager line with:
+     board_manager:
+       additional_urls:
+         - http://arduino.esp8266.com/stable/package_esp8266com_index.json
+  *  arduino-cli core update-index
+  *  arduino-cli install esp32:esp32
+  *  arduino-cli board listall
+
+  Install dependencies:
+  *  arduino-cli lib install "DHT sensor library"
+  *  arduino-cli lib install "Adafruit Unified Sensor"
+  *  arduino-cli lib install "Adafruit IO Arduino"
+
+  Build
+  *  make 
+
+  Upload 
+  *  make upload        # set serial port path in Makefile

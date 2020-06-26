@@ -1,0 +1,5 @@
+# derived objects from build
+minicom.cap
+build/
+*.elf
+*.bin
