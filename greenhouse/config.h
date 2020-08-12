@@ -1,12 +1,14 @@
 #ifndef Config_h
 #define Config_h
 
+#define CONFIG_VERSION                  2
 #define SSID_MAX_LEN                   32
 #define PASS_MAX_LEN                   32
 #define USERNAME_MAX_LEN               32
 #define KEY_MAX_LEN                    48
 
 typedef struct config {
+  uint8_t version;
   /* User supplied settings */
   char wifi_ssid[SSID_MAX_LEN];
   char wifi_pass[PASS_MAX_LEN];

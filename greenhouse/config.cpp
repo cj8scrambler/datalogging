@@ -45,14 +45,16 @@ void Config::load()
     _config->aio_key[KEY_MAX_LEN-1] = '\0';
 
 #ifdef DEBUG
-  Serial.printf("Loaded %d bytes of data from EEPROM\r\n", sizeof(systemConfig));
+  Serial.printf("Loaded %d bytes of data from EEPROM (version %d)\r\n",
+                sizeof(systemConfig), _config->version);
   dumpConfig();
 #endif
 
   if ((_config->wifi_ssid[0] == '\0') ||
       (_config->wifi_pass[0] == '\0') ||
       (_config->aio_username[0] == '\0') ||
-      (_config->aio_key[0] == '\0'))
+      (_config->aio_key[0] == '\0') ||
+       _config->version != CONFIG_VERSION)
   {
 #ifdef DEBUG
   Serial.println("Forcing RECONFIG based on missing data");
@@ -65,6 +67,8 @@ void Config::reconfig()
 {
   int i;
   char buff[MAX_LINE_SIZE];
+
+  _config->version = CONFIG_VERSION;
 
   /* Turn off all external devices to be safe */
   _config->heat_level = 0;
@@ -138,6 +142,7 @@ void Config::set_light(uint8_t level)
   {
     _config->light_level = level;
     saveSettings();
+    Serial.printf("Updated light level to: %d\r\n", _config->light_level);
   }
 }
 
@@ -152,6 +157,7 @@ void Config::set_heat(uint8_t level)
   {
     _config->heat_level = level;
     saveSettings();
+    Serial.printf("Updated heat level to: %d\r\n", _config->heat_level);
   }
 }
 
@@ -166,6 +172,7 @@ void Config::set_fan(uint8_t level)
   {
     _config->fan_level = level;
     saveSettings();
+    Serial.printf("Updated fan level to: %d\r\n", _config->fan_level);
   }
 }
 

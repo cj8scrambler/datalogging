@@ -8,6 +8,8 @@ Arduino IDE Setup:
   *  Adafruit Unified Sensor
   *  DHT sensor library
   *  Adafruit IO Arduino
+  *  Adafruit BMP3XX Library
+  *  Adafruit VEML6075 Library
 
 -------------------------------------------------------------
 
@@ -21,15 +23,21 @@ Or build / upload directly from the command line:
   *  edit ~/.arduino15/arduino-cli.yaml and replace the board_manager line with:
      board_manager:
        additional_urls:
-         - http://arduino.esp8266.com/stable/package_esp8266com_index.json
+        - http://arduino.esp8266.com/stable/package_esp8266com_index.json
+        - https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
   *  arduino-cli core update-index
-  *  arduino-cli install esp32:esp32
+  *  arduino-cli core search
+       List core packages available
+  *  arduino-cli core install esp8266:esp8266
   *  arduino-cli board listall
+       Set BOARD variable in Makefile to appropriate board (such as 'esp8266:esp8266:huzzah')
 
   Install dependencies:
+  *  arduino-cli lib install "Adafruit IO Arduino"
   *  arduino-cli lib install "DHT sensor library"
   *  arduino-cli lib install "Adafruit Unified Sensor"
-  *  arduino-cli lib install "Adafruit IO Arduino"
+  *  arduino-cli lib install "Adafruit BMP3XX Library"
+  *  arduino-cli lib install "Adafruit VEML6075 Library"
 
   Build
   *  make 
