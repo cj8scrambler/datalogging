@@ -56,6 +56,11 @@ void setup()
 
   if (uv.begin())
   {
+    /*
+     * Use default open-air coefficients from:
+     * https://cdn.sparkfun.com/assets/3/9/d/4/1/designingveml6075.pdf
+     */
+    uv.setCoefficients(2.22, 1.33, 2.95, 1.74, 0.001461, 0.002591);
     have_veml = true;
   } else {
     Serial.printf("%ld - No VEML6075 found\r\n", millis());
@@ -190,9 +195,27 @@ void setup()
       {
         uv_index->save(uvi);
 #ifdef DEBUG
-        Serial.printf("%ld - UVA: %.1f\r\n", millis(), uv.readUVA());
-        Serial.printf("%ld - UVB: %.1f\r\n", millis(), uv.readUVB());
         Serial.printf("%ld - UV Index: %.1f\r\n", millis(), uv_index->data->toFloat());
+#endif
+      }
+
+      float uva = uv.readUVA();
+      AdafruitIO_Feed *uv_a = io.feed("UV-A");
+      if (!isnan(uva))
+      {
+        uv_a->save(uva);
+#ifdef DEBUG
+        Serial.printf("%ld - UV-A: %.1f\r\n", millis(), uv_a->data->toFloat());
+#endif
+      }
+
+      float uvb = uv.readUVB();
+      AdafruitIO_Feed *uv_b = io.feed("UV-B");
+      if (!isnan(uvb))
+      {
+        uv_b->save(uvb);
+#ifdef DEBUG
+        Serial.printf("%ld - UV-B: %.1f\r\n", millis(), uv_b->data->toFloat());
 #endif
       }
     }
