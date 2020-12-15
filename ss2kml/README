@@ -1,0 +1,3 @@
+Utility to read contents of a Googe Sheets spreadsheet, lookup addresses,
+snap to roads and generate a KML of lines.  This particular data was
+blocks participating in town-wide event.
