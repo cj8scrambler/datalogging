@@ -1,3 +1,18 @@
+This project logs data using an ESP8266 Arduino board to the
+adafruit.io MQTT backend for monitoring conditions in greenhouse.
+
+The device runs off of battery with a solar cell connected for
+charging.  On sunny summer days it can run on it's own.  On
+cold winter cloudy days it needs to be manually recharged every
+2 weeks.
+
+The following data is logged:
+  * DHT22 - humidity and temperature
+  * VEML6070 - Ultraviolet light (discontinued part)
+  * BMP388 - Barometric pressure and temperature
+  * A/D - Battery voltage
+
+-------------------------------------------------------------
 Arduino IDE Setup:
 
   File->Preferences->Additional Boards Manager URLs: 
