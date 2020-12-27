@@ -23,4 +23,4 @@ upload: $(TARGET).elf
 .PHONY: clean
 clean:
 	# Should also clean up /tmp/arduino-* but need a clean way to do that
-	rm -f $(TARGET).elf $(TARGET).bin
+	rm -rf $(TARGET).elf $(TARGET).bin build/

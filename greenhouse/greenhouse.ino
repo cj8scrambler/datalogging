@@ -20,7 +20,7 @@
 #define SLEEP_TIME_US              (300 * 1000000)
 
 // How long to wait for wifi
-#define WIFI_WAIT_MSEC                 12000
+#define WIFI_WAIT_MSEC                 15000
 
 DHT_Unified dht(12, DHT22);
 Adafruit_BMP3XX bmp; // I2C
@@ -125,14 +125,14 @@ void setup()
     Serial.printf("%ld - Begin readings\r\n", millis());
 #endif
 
-    AdafruitIO_Feed *batt_mv = io.feed("batt_mv");
-    // 1.8V reference for a 10-bit ADC connected to Bat (0-5V) with
-    // a 15k/33k voltage divider; scale up to mv and round to an int:
-    //  =round(((X/1024) * 1.8) * (48 / 15) * 1000) == (X * 5.625)
+    AdafruitIO_Feed *batt_v = io.feed("batt_v");
+    // 1.0V reference for a 10-bit ADC connected to Bat (0-5V) with
+    // a 14.83k/84.4k voltage divider; scale up to mv and round to an int:
+    //  =round(((X/1024) * 1.0) * (84.4 / 14.83)) == (X * 0.006644)
     int raw = analogRead(A0);
-    batt_mv->save((uint16_t)((raw * 5.625) + 0.5));
+    batt_v->save(raw * .006644);
 #ifdef DEBUG
-    Serial.printf("%ld - Raw A/D count: %d  scaled to mv: %d\r\n", millis(), raw, (uint16_t)((raw * 5.625) + 0.5));
+    Serial.printf("%ld - Raw A/D count: %d  scaled to: %.1f\r\n", millis(), raw, (raw * .006644));
 #endif
 
     if (have_bmp) {
