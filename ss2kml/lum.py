@@ -14,12 +14,13 @@ from google.auth.transport.requests import Request
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 # Google Sheets source data
-DOCUMENT_ID = 'XXXXX_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX4'
+DOCUMENT_ID = 'XXXXX_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
 
 # Tabs to itterate over in Google Sheet.  These are hardcode
 # because I couldn't figure this out dynamicly.
 SHEETS=['BEYE ZONE', 'HATCH ZONE', 'HOLMES ZONE', 'IRVING ZONE',
-        'LINCOLN ZONE', 'LONGFELLOW ZONE', 'MANN ZONE', 'WHITTIER ZONE']
+        'LINCOLN ZONE', 'LONGFELLOW ZONE', 'MANN ZONE', 'WHITTIER ZONE',
+        'FOREST PARK ZONE', 'RIVER FOREST', 'GALEWOOD ZONE']
 
 # Google APIs key from https://console.developers.google.com/
 # This is a personal key which can cost money if there is a large volume
@@ -73,6 +74,11 @@ def main(only_count):
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
+            if not os.path.exists('credentials.json'):
+                print("Create a 'credentials.json' file which contains your " +
+                        "OAuth client ID and secret.  For more details, see:")
+                print("https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred")
+                return
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
@@ -104,14 +110,23 @@ def main(only_count):
                 # Use a regexp to extract the block number and the rest of the address
                 match = re.search(RE_PATTERN, row[0])
                 if match:
+                    city = "Oak Park, IL"
+                    if 'FOREST PARK' in tab:
+                        city = "Forest Park, IL"
+                    if 'RIVER FOREST' in tab:
+                        city = "River Forest, IL"
+                    if 'GALEWOOD' in tab:
+                        city = "Chicago, IL"
+
                     total += 1
+
+                    print ("%s %s" % (match.group(1), match.group(2)))
 
                     if only_count:
                         continue
 
-                    print ("%s %s" % (match.group(1), match.group(2)))
-
-                    startpoint = street_loc(int(match.group(1)), ' ' + match.group(2) + ', Oak Park, IL')
+                    print ("{} {}, {}".format(match.group(1), match.group(2), city))
+                    startpoint = street_loc(int(match.group(1)), "{}, {}".format(match.group(2), city))
 
                     # Take a guess at an address that represents the end of the block.
                     # Most blocks go up to about 45.  A few blocks start at 50 and go
@@ -124,8 +139,8 @@ def main(only_count):
                     else:
                         last_address = int(match.group(1))+48
 
-                    print ("  %d %s" % (last_address, match.group(2)))
-                    endpoint = street_loc(last_address, ' ' + match.group(2) + ', Oak Park, IL')
+                    print ("{} {}, {}".format(last_address, match.group(2), city))
+                    endpoint = street_loc(last_address, "{}, {}".format(match.group(2), city))
 
                     # Take the location and snap it to the nearest road
                     street = gmaps.nearest_roads([startpoint, endpoint])
@@ -139,14 +154,15 @@ def main(only_count):
                     line.style.linestyle.color = 'ff0000ff'
                     line.style.linestyle.width = 10
                 else:
-                    print("Could not parse: %s" % (row[0]))
+                    if 'ZONE' not in row[0]:
+                        print("Could not parse: %s" % (row[0]))
         print("")
 
     if only_count:
         print("Counted %d participating blocks" % (total));
     else:
         kmlfile = 'Participating Blocks - ' + str(total) + ' as of '
-        kmlfile += date.today().strftime("%m_%d") +'.kml'
+        kmlfile += date.today().strftime("%b %d") +'.kml'
         kml.save(kmlfile)
         print("Saved data to: %s" % (kmlfile))
 

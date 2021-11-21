@@ -1,3 +1,21 @@
 Utility to read contents of a Googe Sheets spreadsheet, lookup addresses,
 snap to roads and generate a KML of lines.  This particular data was
 blocks participating in town-wide event.
+
+Python Setup
+------------
+  python3 -m venv .venv
+  . ./.venv/bin/activate
+  pip install --upgrade pip setuptools wheel 
+  pip install -r requirements.txt 
+
+Setup
+-----
+  Configure the DOCUMENT_ID in lum.py (from the source spreadsheet URL)
+  Configure G_KEY with your Google APIs key (https://console.developers.google.com)
+  Create a credentials.json file with your OAuth ID/secret (https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred)
+
+Use
+---
+  run: python3 lum.py
+  Manually import the generated KML file into https://mymaps.google.com
