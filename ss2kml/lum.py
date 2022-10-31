@@ -14,6 +14,7 @@ from google.auth.transport.requests import Request
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 # Google Sheets source data
+# Original 2021 sign up sheet
 DOCUMENT_ID = 'XXXXX_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
 
 # Tabs to itterate over in Google Sheet.  These are hardcode
@@ -53,7 +54,7 @@ def street_loc(number, location_string):
     middle_long = (float(loc1[0]['geometry']['location']['lng']) +
                    float(loc2[0]['geometry']['location']['lng'])) / 2.0 
     point = {'latitude': middle_lat, 'longitude': middle_long}
-    print("  R: %s" % (point))
+    print("    R: %s" % (point))
     return point
 
 def main(only_count):
@@ -95,7 +96,7 @@ def main(only_count):
     total = 0
     for tab in SHEETS:
         # Get Column A from each tab
-        result = sheet.values().get(spreadsheetId=DOCUMENT_ID, range=tab+'!A1:A99').execute()
+        result = sheet.values().get(spreadsheetId=DOCUMENT_ID, range=tab+'!A1:B99').execute()
         values = result.get('values', [])
 
         print('Spreadsheet tab: %s' % (tab))
@@ -106,6 +107,12 @@ def main(only_count):
                 # Skip the empty cells
                 if not len(row):
                     continue
+
+                # Expected column data:
+                #   row[0] Block name
+                #   row[1] Block captain
+                #   row[2] Captain email
+                #   row[3] Captain cell
 
                 # Use a regexp to extract the block number and the rest of the address
                 match = re.search(RE_PATTERN, row[0])
@@ -120,26 +127,47 @@ def main(only_count):
 
                     total += 1
 
-                    print ("%s %s" % (match.group(1), match.group(2)))
+                    print ("%s %s (%d)" % (match.group(1), match.group(2), len(row)))
 
                     if only_count:
                         continue
 
-                    print ("{} {}, {}".format(match.group(1), match.group(2), city))
-                    startpoint = street_loc(int(match.group(1)), "{}, {}".format(match.group(2), city))
+                    # 400 S. Grove doesn't resolve correctly (use 401 instead)
+                    if ('S Grove' in match.group(2) or 'S. Grove' in match.group(2)) and (400 == int(match.group(1))):
+                        first_address = 401
+                    else:
+                        first_address = int(match.group(1))
+
+                    print ("  {} {}, {}".format(first_address, match.group(2), city))
+                    startpoint = street_loc(first_address, "{}, {}".format(match.group(2), city))
 
                     # Take a guess at an address that represents the end of the block.
                     # Most blocks go up to about 45.  A few blocks start at 50 and go
-                    # up to 99 (far south end of OP).  But some blocks need to go over
-                    # 50 to get to the end.
-                    if 'N Cuyler' in match.group(2):
+                    # up to 99 (far south end of OP).  But the eastern blocks need to
+                    # go over 50 to get to the end.
+                    if 'Cuyler' in match.group(2):
                         last_address = int(match.group(1))+98
-                    elif 'N Harvey' in match.group(2):
+                    elif 'N Harvey' in match.group(2) or 'N. Harvey' in match.group(2):
                         last_address = int(match.group(1))+98
+                    elif 'N Lombard' in match.group(2) or 'N. Lombard' in match.group(2):
+                        last_address = int(match.group(1))+98
+                    elif 'N Taylor' in match.group(2) or 'N. Taylor' in match.group(2):
+                        last_address = int(match.group(1))+98
+                    elif 'Hayes' in match.group(2):
+                        last_address = int(match.group(1))+98
+                    elif 'N Humphrey' in match.group(2) or 'N. Humphrey' in match.group(2):
+                        last_address = int(match.group(1))+98
+                    elif 'Lathrop' in match.group(2):
+                        last_address = int(match.group(1))+98
+#                    elif 'S Humphrey' in match.group(2) or 'S. Humphrey' in match.group(2):
+#                        # 500 S. Humphrey has to end with 44/45 (not 48/49)
+#                        if '1100' in match.group(1):
+#                            last_address = int(match.group(1))+44
                     else:
-                        last_address = int(match.group(1))+48
+#                        last_address = int(match.group(1))+48
+                        last_address = int(match.group(1))+44
 
-                    print ("{} {}, {}".format(last_address, match.group(2), city))
+                    print ("  {} {}, {}".format(last_address, match.group(2), city))
                     endpoint = street_loc(last_address, "{}, {}".format(match.group(2), city))
 
                     # Take the location and snap it to the nearest road
@@ -150,7 +178,12 @@ def main(only_count):
                         points.append(point)
 
                     # Draw a thick red line on that road segment
-                    line = kml.newlinestring(name=row[0], coords=points)
+                    if (len(row) >= 2):
+                        line = kml.newlinestring(name=row[0],
+                                                 description="Organzed by {}".format(row[1]),
+                                                 coords=points)
+                    else:
+                        line = kml.newlinestring(name=row[0], coords=points)
                     line.style.linestyle.color = 'ff0000ff'
                     line.style.linestyle.width = 10
                 else:
