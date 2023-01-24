@@ -8,10 +8,13 @@ import temp
 import configparser
 import RPi.GPIO as GPIO
 from distutils.util import strtobool
-from glob import glob
+from queue import SimpleQueue
+#from glob import glob
 from rpi_lcd import LCD
 #from time import sleep,now
+from datetime import datetime, timezone
 import board
+
 from adafruit_seesaw import seesaw, rotaryio, digitalio, neopixel
 
 """
@@ -74,20 +77,26 @@ EVENT_LOOP_WAIT_MS = 100
 
 class Controller:
   
-  def __init__(self, config, heat_gpio, cool_gpio, \
-               tempdev, display_addr, rot_addr):
+  def __init__(self, name, config, heat_gpio, cool_gpio, \
+               tempdev, tiltdev, display_addr, rot_addr):
 
+    self._name = name
     self._config = config
     self._state = STATES.index('IDLE')
     self._mode = MODES.index('INVALID')
     self._goidle = time.time()
     self._temp = tempdev
+    self._tilt = tiltdev
     self._last_disp_temp = None
     self._last_mode_update = 0
+    self._run = True;
+    self._ = True;
+    self.q = SimpleQueue()
+
 
     # Temp placeholders
-    self._tilt_temp = 72.0
-    self._tilt_sg = 1.042
+    self._tilt_temp = None
+    self._tilt_sg = None
 
     if GPIO.getmode() != GPIO.BCM:
         GPIO.setmode(GPIO.BCM)
@@ -128,26 +137,50 @@ class Controller:
       self._mode = MODES.index('INVALID')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 0)
+      self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
+                  'name': f"{self._name}",               \
+                  'setpoint': float(self._config['setpoint']),
+                  'window': float(self._config['window']),
+                  'heat': 0,
+                  'cool': 0})
       if self._pixel:
           self._pixel.fill(YELLOW)
     elif self._temp.last() > (float(self._config['setpoint']) + \
-                             float(self._config['window'])):
+                              float(self._config['window'])):
       self._mode = MODES.index('COOL')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 1)
+      self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
+                  'name': f"{self._name}",               \
+                  'setpoint': float(self._config['setpoint']),
+                  'window': float(self._config['window']),
+                  'heat': 0,
+                  'cool': 100})
       if self._pixel:
           self._pixel.fill(BLUE)
     elif self._temp.last() < (float(self._config['setpoint']) - \
-                             float(self._config['window'])):
+                              float(self._config['window'])):
       self._mode = MODES.index('HEAT')
-      GPIO.output(self._heat_gpio, 1)
       GPIO.output(self._cool_gpio, 0)
+      GPIO.output(self._heat_gpio, 1)
+      self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
+                  'name': f"{self._name}",               \
+                  'setpoint': float(self._config['setpoint']),
+                  'window': float(self._config['window']),
+                  'heat': 100,
+                  'cool': 0})
       if self._pixel:
           self._pixel.fill(RED)
     else:
       self._mode = MODES.index('OFF')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 0)
+      self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
+                  'name': f"{self._name}",               \
+                  'setpoint': float(self._config['setpoint']),
+                  'window': float(self._config['window']),
+                  'heat': 0,
+                  'cool': 0})
       if self._pixel:
           self._pixel.fill(BLACK)
 
@@ -195,8 +228,8 @@ class Controller:
     else:
       logging.error("Display update unknown state: {}".format(self._state))
 
-    logging.info("Display Update: {:16s}".format(lines[0]))
-    logging.info("                {:16s}".format(lines[1]))
+    logging.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[0]))
+    logging.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[1]))
     if self._lcd:
       self._lcd.text(lines[0], 1)
       self._lcd.text(lines[1], 2)
@@ -205,7 +238,7 @@ class Controller:
     return (time.time() > self._goidle)
 
   def control_thread(self):
-    while True:
+    while self._run:
       begin_time = time.time()
       uichange = False
       display_update = False
@@ -247,14 +280,14 @@ class Controller:
         if STATES[self._state] == 'SET':
           self._config['setpoint'] = str(float(self._config['setpoint']) + \
                                          (pos - self._last_pos) / 10.0)
-          self._config['update'] = 'True'
+          self._config['updated'] = 'True'
           uichange = True
           logging.info("New setpoint: {}".format(self._config['setpoint']))
         elif STATES[self._state] == 'TILT':
           new_i = (TILTCOLORS.index(self._config['tiltcolor']) + \
                    (pos - self._last_pos)) % len(TILTCOLORS)
           self._config['tiltcolor'] = TILTCOLORS[new_i]
-          self._config['update'] = 'True'
+          self._config['updated'] = 'True'
           uichange = True
           logging.info("New Tilt Color: {}".format(self._config['tiltcolor']))
         elif STATES[self._state] == 'WIND':
@@ -262,7 +295,7 @@ class Controller:
           new_w = max(WINMIN, min(WINMAX, new_w))
           if new_w != float(self._config['window']):
             self._config['window'] = str(new_w)
-            self._config['update'] = 'True'
+            self._config['updated'] = 'True'
             uichange = True
             logging.info("New Window: {}".format(self._config['window']))
   
@@ -271,16 +304,10 @@ class Controller:
         self._goidle = time.time() + IDLE_TIMEOUT
         display_update = True
 
-      # Check for idle timeout
-      if self.is_idle() and self._state != STATES.index('IDLE'):
-        logging.debug("Idle timeout")
-        self._state = STATES.index('IDLE')
-        display_update = True
-
       # Check for temp change in IDLE
       if (self._state == STATES.index('IDLE')) and \
          (self._last_disp_temp != self._temp.last()):
-        logging.debug("Temp Change: {} -> {}".format(self._last_disp_temp, self._temp.last()))
+        logging.debug("Temp Change (ctrl-{}): {} -> {}".format(self._temp._bus, self._last_disp_temp, self._temp.last()))
         display_update = True
 
       if display_update:
@@ -289,5 +316,28 @@ class Controller:
       self._last_but = but
       self._last_pos = pos
 
+      # Lower Priority Work
+      if (time.time() - begin_time) < (EVENT_LOOP_WAIT_MS / 2000.0):
+        # Update Tilt data
+        if self._config['tiltcolor'] != 'NONE' and \
+           self._tilt is not None:
+          last = self._tilt.get_last(self._config['tiltcolor'])
+          # TODO: check timestamp to see if it's recent enough
+          if last is not None:
+            self._tilt_temp = last['temp']
+            self._tilt_sg = last['sg']
+
+        # Check for idle timeout
+        if self.is_idle() and self._state != STATES.index('IDLE'):
+          logging.debug("Idle timeout")
+          self._state = STATES.index('IDLE')
+          display_update = True
+
       while (time.time() - begin_time) < (EVENT_LOOP_WAIT_MS / 1000.0):
         time.sleep(0.01)
+
+  def end(self):
+    self._run = False
+    self._pixel.fill(BLACK)
+    self._lcd.text("", 1)
+    self._lcd.text("", 2)

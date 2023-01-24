@@ -1,5 +1,5 @@
 # TiltPiRelay
-Temp controller relay which uses DS18B20 temp sensors and Tilt hydrometers to monitor temperature, control power relays and log data at adafruit.io.  This is intended for a temp controller and data logger for beer fermentation.  It can control 2 seperate fermentations and also monitor ambient and glycol temperatures.  It's written as a python script and intended to run on a Raspberry Pi.
+Temp controller relay which uses DS18B20 temp sensors and Tilt hydrometers to monitor temperature, control power relays and log data at adafruit.io.  This is intended for a temp controller and data logger for beer fermentation.  It can control 2 seperate fermentations and also monitor internal, ambient and glycol temperatures.  It's written as a python script and intended to run on a Raspberry Pi.
 
 ## Hardware
 
@@ -36,6 +36,9 @@ pip3 install -r requirements.txt
 CFLAGS="-fcommon"  pip3 install RPi.GPIO
 ```
 
+### BLE Support
+To receive Tilt hydrometer data, you'll need a BLE capable bluetooth controller.  The Tilt hydrometer sends data in repeated BLE advertisements.  However the Linux kernel and BlueZ stack filter out duplicate BLE advertisements.  As of January 2023, this is [changing](https://github.com/hbldh/bleak/issues/1065#issuecomment-1268947370), but for now, hcidump is used to avoid the problem.  This requires [special configuration](https://github.com/adafruit/Adafruit_Blinka_bleio#support-for-duplicate-advertisement-scanning-on-linux) so that a regular user can run hcidump.
+
 ### Load w1 busses
 The 5 W1 busses need to be started in order so that the script knows which bus is which temp sensor:
 ```
@@ -43,5 +46,5 @@ sudo dtoverlay w1-gpio gpiopin=17 pullup=0
 sudo dtoverlay w1-gpio gpiopin=27 pullup=0
 sudo dtoverlay w1-gpio gpiopin=23 pullup=0
 sudo dtoverlay w1-gpio gpiopin=24 pullup=0
-sudo dtoverlay w1-gpio gpiopin=25 pullup=0
+sudo dtoverlay w1-gpio gpiopin=4 pullup=0
 ```

@@ -3,86 +3,89 @@
 """
   Tilt Hydrometer scanner class
 
-  Uses bleak library to read any available Tilt Hydrometer data
+  Based on details from:
+  https://kvurd.com/blog/tilt-hydrometer-ibeacon-data-format/
 """
 
-from bleak import BleakScanner
-from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import AdvertisementData
+#pip install adafruit-circuitpython-ble
+from adafruit_ble import BLERadio
+
 from struct import unpack
 from datetime import datetime, timedelta, timezone
 from queue import SimpleQueue
-#from collections import deque
-import asyncio
+import os
+import time
+import binascii
 import logging
 
-## Group name to store all feeds in
-#GROUP_NAME = 'Tilt Hydrometers'
-
+MANUFACTURER_DATA = 0xFF
 APPLE_COMPANY_ID = 0x004C
 IBEACON_TYPE = 0x02
 
-TILTCOLOR = {                                    \
-    'A495BB10C5B14B44B5121370F02D74DE': 'red',   \
-    'A495BB20C5B14B44B5121370F02D74DE': 'green', \
-    'A495BB30C5B14B44B5121370F02D74DE': 'black', \
-    'A495BB40C5B14B44B5121370F02D74DE': 'purple',\
-    'A495BB50C5B14B44B5121370F02D74DE': 'orange',\
-    'A495BB60C5B14B44B5121370F02D74DE': 'blue',  \
-    'A495BB70C5B14B44B5121370F02D74DE': 'yellow',\
-    'A495BB80C5B14B44B5121370F02D74DE': 'pink' }
-
+TILTCOLOR = {
+    'A495BB10C5B14B44B5121370F02D74DE': 'RED',
+    'A495BB20C5B14B44B5121370F02D74DE': 'GREEN',
+    'A495BB30C5B14B44B5121370F02D74DE': 'BLACK',
+    'A495BB40C5B14B44B5121370F02D74DE': 'PURPLE',
+    'A495BB50C5B14B44B5121370F02D74DE': 'ORANGE',
+    'A495BB60C5B14B44B5121370F02D74DE': 'BLUE',
+    'A495BB70C5B14B44B5121370F02D74DE': 'YELLOW',
+    'A495BB80C5B14B44B5121370F02D74DE': 'PINK',
+    '': 'UNKNOWN'
+}
 
 class TiltScanner:
   
   def __init__(self):
-    self.scanner = BleakScanner()
-    self.scanner.register_detection_callback(HandleBleAdv)
+    self.ble = BLERadio()
     self.last = { c: None for c in TILTCOLOR.values() }
     self.q = { c: SimpleQueue() for c in TILTCOLOR.values() }
+    self._run = True;
 
-  def HandleBleAdv(self, device: BLEDevice, advertisement_data: AdvertisementData):
-    if advertisement_data.manufacturer_data:
-      for company in advertisement_data.manufacturer_data:
-        data = bytes(advertisement_data.manufacturer_data[company])
-        if (company == APPLE_COMPANY_ID) and (data[0] == IBEACON_TYPE):
-          uuid = data[2:18].hex().upper()
+  def HandleBleAdv(self, advertisement_data):
+    if MANUFACTURER_DATA in advertisement_data.data_dict:
+      mfgdata =  advertisement_data.data_dict[MANUFACTURER_DATA]
+      if (len(mfgdata) >= 25):
+        (company, subtype) = unpack('<HB', bytes(mfgdata[0:3]))
+        if (company == APPLE_COMPANY_ID) and (subtype == IBEACON_TYPE):
+          uuid = mfgdata[4:20].hex().upper()
           if uuid in TILTCOLOR:
             color = TILTCOLOR[uuid]
-            (major,minor,tx) = unpack('>HHB', bytes(data[18:23]))
-            datapoint = {'timestamp': datetime.now(timezone.utc).isoformat(), \
-                         'color': color,                           \
-                         'temp': major,                            \
-                         'sg': minor / 1000.0,                     \
-                         'tx': tx,                                 \
-                         'rssi': device.rssi }
-            self.last[color] = datapoint
-            self.q[color].put(datapoint)
-            logging.debug("Recorded {} data: {}".format(color, datapoint))
+            logging.error(f"DZ got data from {color} tilt color uuid: {uuid}")
+          else:
+            logging.error(f"Got data from unknown tilt color uuid: {uuid}")
+            color = 'UNKNOWN' 
 
-  def startScan():
-    self.scanner.start()
+          (temp,sg,tx) = unpack('>HHB', bytes(mfgdata[20:25]))
+          datapoint = {'timestamp': datetime.now(timezone.utc).timestamp(),
+                       'name': f"tilt-{color}",
+                       'temp': temp,
+                       'sg': sg / 1000.0,
+                       'tx': tx,
+                       'rssi': advertisement_data.rssi }
+          self.last[color] = datapoint
+          self.q[color].put(datapoint)
+          logging.debug(f"Added tilt record: {datapoint} size: {self.q[color].qsize()}")
 
-  def stopScan():
-    self.scanner.stop()
+  def get_last(self, color):
+   return self.last[color]
 
-  def popData(color):
-    try:
-      self.q[color].get()
-    except Queue.Empty:
-      return None
+  def get_queue(self, color):
+    return  self.q[color]
 
-  def last(color):
-    return self.last[color]
+  def control_thread(self):
+    while self._run:
+      for advertisement in self.ble.start_scan(minimum_rssi=-100):
+        self.HandleBleAdv(advertisement)
+      self.ble.stop_scan();
+      time.sleep(0.1)
 
-#  async def control_thread():
-  def control_thread():
-    while True:
-        await scanner.start()
-        await asyncio.sleep(5)
-        await scanner.stop()
+  def end(self):
+    self._run = False
+    self.ble.stop_scan()
 
 if __name__ == "__main__":
+
     logging.basicConfig(level=logging.DEBUG)
 
     # Uncomment to set a different BLE log level
@@ -96,4 +99,5 @@ if __name__ == "__main__":
     #requests_log.setLevel(logging.DEBUG)
     #requests_log.propagate = True
 
-    asyncio.run(main())
+    ts = TiltScanner()
+    ts.control_thread()

@@ -20,8 +20,9 @@ INTERVALS_MEDIAN_SIZE = 5
 
 class Temp:
   
-  def __init__(self, w1_bus):
+  def __init__(self, name, w1_bus):
     self._bus = w1_bus
+    self._name = name
     self._file = None
     self._last_temp  = None
     self._last_time  = None
@@ -65,13 +66,16 @@ class Temp:
     f.close()
 
     # value is in thousandths of degrees C; convert to decimal F
-    self._last_temp = (float(lines[-1]) * 9/5000) + 32.0
-    logging.debug("Read temp on {}: {} F".format(self._bus, self._last_temp))
+    if (len(lines)):
+      self._last_temp = (float(lines[-1]) * 9/5000) + 32.0
+      logging.debug("Read temp on {}: {} F".format(self._bus, self._last_temp))
 
-    if q:
-      q.put({'timestamp': datetime.now(timezone.utc).isoformat(),
-             'temp': self._last_temp})
-    return self._last_temp
+      if q:
+        q.put({'timestamp': datetime.now(timezone.utc).timestamp(),
+               'name': self._name,
+               'temp': self._last_temp})
+      return self._last_temp
+    return None
 
   def last(self):
     return self._last_temp
