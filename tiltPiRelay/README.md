@@ -1,13 +1,16 @@
 # TiltPiRelay
 Temp controller relay which uses DS18B20 temp sensors and Tilt hydrometers to monitor temperature, control power relays and log data at adafruit.io.  This is intended for a temp controller and data logger for beer fermentation.  It can control 2 seperate fermentations and also monitor internal, ambient and glycol temperatures.  It's written as a python script and intended to run on a Raspberry Pi.
 
+![outside](hw/outside.jpg "Outside")
+
+
 ## Hardware
 
 ### Relay Board
-I used an off the shelf 4-relay Pi HAT.  The 4 relays allow for 3 states (Heat/Cold/Off) for each of the two monitored channels.
+The controller uses an [off the shelf 4-relay Pi HAT](https://www.amazon.com/gp/product/B072XGF4Z3).  The 4 relays allow for 3 states (Heat/Cold/Off) for each of the two monitored channels.
 
 ### LCD / Rotary Encoder / LEDs
-The rotary encoder used from Adafruit includes a controller and RGB LED which can be accessed by I2C.  The LCD is also I2C and can be daisy chained from the rotary encoder board.  To simplify the wiring, an interposer HAT was created which adds qwiic connectors.
+The [rotary encoder](https://www.adafruit.com/product/4991) used from Adafruit includes a controller and RGB LED which can be accessed by I2C.  The LCD is a HD44780 based 16x2 I2C display.  All the I2C devices can be daisy chained together.  To simplify the wiring, an interposer HAT was created which adds qwiic connectors.
 
 ### Temp sensors
 There are 5 one-wire-bus temp sensors supported:
@@ -20,6 +23,17 @@ There are 5 one-wire-bus temp sensors supported:
 Each temp sensor is expected to be on it's own bus (GPIO).  This way there is no need to figure out the address of each sensor.  A 3.5mm stereo headset connector is used to make the temperature probes removeable.
 
 ### Connector Interposer
+An interposer board simplifies connecting the 1-wire bus temp sensors and I2C deices.  Design files:
+  * [Schematic](hw/schematic.pdf) PDF
+  * KiCAD design files
+    * [Project](hhw/Hat.kicad_pro)
+    * [Schematic](hw/Hat.kicad_sch)
+    * [PCB](h2/Hat.kicad_pcb)
+
+### Assembly
+Inside assembly without high voltage connected
+![inside](hw/inside.jpg "Inside")
+
 
 ## Software
 
