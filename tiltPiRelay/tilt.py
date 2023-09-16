@@ -7,20 +7,29 @@
   https://kvurd.com/blog/tilt-hydrometer-ibeacon-data-format/
 """
 
+import sys
+import os
+import time
+import logging
+import binascii
+
+# BLERadio uses _bleak which require 3.8+
+if sys.version_info[0] < 3 or sys.version_info[1] < 8:
+  raise Exception("Must be using Python 3.8 or newer")
 #pip install adafruit-circuitpython-ble
 from adafruit_ble import BLERadio
 
 from struct import unpack
 from datetime import datetime, timedelta, timezone
 from queue import SimpleQueue
-import os
-import time
-import binascii
-import logging
+
+logger = logging.getLogger('tiltpirelay.tilt')
 
 MANUFACTURER_DATA = 0xFF
 APPLE_COMPANY_ID = 0x004C
 IBEACON_TYPE = 0x02
+
+BLE_SCAN_TIME = 5.0
 
 TILTCOLOR = {
     'A495BB10C5B14B44B5121370F02D74DE': 'RED',
@@ -38,6 +47,7 @@ class TiltScanner:
   
   def __init__(self):
     self.ble = BLERadio()
+    #self.ble._adapter.ble_backend = "bleak"
     self.last = { c: None for c in TILTCOLOR.values() }
     self.q = { c: SimpleQueue() for c in TILTCOLOR.values() }
     self._run = True;
@@ -51,21 +61,18 @@ class TiltScanner:
           uuid = mfgdata[4:20].hex().upper()
           if uuid in TILTCOLOR:
             color = TILTCOLOR[uuid]
-            logging.error(f"DZ got data from {color} tilt color uuid: {uuid}")
+            (temp,sg,tx) = unpack('>HHB', bytes(mfgdata[20:25]))
+            datapoint = {'timestamp': datetime.now(timezone.utc).timestamp(),
+                         'name': f"tilt-{color}",
+                         'temp': temp,
+                         'sg': sg / 1000.0,
+                         'tx': tx,
+                         'rssi': advertisement_data.rssi }
+            self.last[color] = datapoint
+            self.q[color].put(datapoint)
+            logger.debug(f"Added tilt record: {datapoint} size: {self.q[color].qsize()}")
           else:
-            logging.error(f"Got data from unknown tilt color uuid: {uuid}")
-            color = 'UNKNOWN' 
-
-          (temp,sg,tx) = unpack('>HHB', bytes(mfgdata[20:25]))
-          datapoint = {'timestamp': datetime.now(timezone.utc).timestamp(),
-                       'name': f"tilt-{color}",
-                       'temp': temp,
-                       'sg': sg / 1000.0,
-                       'tx': tx,
-                       'rssi': advertisement_data.rssi }
-          self.last[color] = datapoint
-          self.q[color].put(datapoint)
-          logging.debug(f"Added tilt record: {datapoint} size: {self.q[color].qsize()}")
+            logger.info(f"Got data from unknown tilt color uuid: {uuid}")
 
   def get_last(self, color):
    return self.last[color]
@@ -75,23 +82,22 @@ class TiltScanner:
 
   def control_thread(self):
     while self._run:
-      for advertisement in self.ble.start_scan(minimum_rssi=-100):
+      for advertisement in self.ble.start_scan(timeout=BLE_SCAN_TIME):
         self.HandleBleAdv(advertisement)
       self.ble.stop_scan();
       time.sleep(0.1)
 
   def end(self):
     self._run = False
-    self.ble.stop_scan()
 
 if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
 
     # Uncomment to set a different BLE log level
-    bleak_log = logging.getLogger("bleak")
-    bleak_log.setLevel(logging.INFO)
-    bleak_log.propagate = True
+    #bleak_log = logging.getLogger("bleak")
+    #bleak_log.setLevel(logging.INFO)
+    #bleak_log.propagate = True
 
     # Uncomment to enable HTTP request debugging
     #HTTPConnection.debuglevel = logging.DEBUG

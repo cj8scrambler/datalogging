@@ -1,11 +1,11 @@
 import time
 import requests
+import logging
 from datetime import datetime, timezone
 from collections import defaultdict
 from Adafruit_IO import Client, Feed, Group, errors
 from queue import SimpleQueue
 
-import logging
 
 """
 IO.Adafruit reporter class
@@ -14,17 +14,18 @@ Reports data points from queues to io.adafruit.com
 
 """
 
+logger = logging.getLogger('tiltpirelay.adafruit')
 DEFAULT_REPORT_INTERVAL_S = 55
 DEFAULT_GROUP_NAME='garage'
 
 class IOAdafruit:
   
-  def __init__(self, user, key, group=DEFAULT_GROUP_NAME):
+  def __init__(self, user, key, interval=DEFAULT_REPORT_INTERVAL_S, group=DEFAULT_GROUP_NAME):
     self._user = user
     self._key = key
+    self._interval = interval
     self._group = group
     self._run = True
-    self._interval = DEFAULT_REPORT_INTERVAL_S
     self._qs = []
 
   def end(self):
@@ -42,12 +43,12 @@ class IOAdafruit:
     try:
       g = aio.groups(self._group)
     except errors.RequestError:
-      logging.info(f"Creating AIO group: {self._group}")
+      logger.warning(f"Creating AIO group: {self._group}")
       g = aio.create_group(Group(name=self._group))
     except requests.exceptions.ConnectionError:
-      logging.info("  Failed to query AIO groups (connection error)")
+      logger.error("  Failed to query AIO groups (connection error)")
     except requests.exceptions.ReadTimeout:
-      logging.info("  Failed to query AIO groups (timeout)")
+      logger.error("  Failed to query AIO groups (timeout)")
 
     for f in g.feeds:
       feeds[f.name] = f
@@ -59,38 +60,38 @@ class IOAdafruit:
           name = data['name']
           delta = data['timestamp'] - last_update[name]
           if delta > self._interval:
-            logging.info(f"Reporting data [delta: {delta}]: {data} (Queue-{i} size: {q.qsize()})")
+            logger.info(f"Reporting data [delta: {delta}]: {data} (Queue-{i} size: {q.qsize()})")
             for k in data:
               if k == 'name' or k == 'timestamp':
                 continue
               feedkey = name + '-' + k
               if not feedkey in feeds:
-                logging.info(f"  Creating new feed: {feeds[feedkey].key}")
+                logger.warning(f"  Creating new feed: {feeds[feedkey].key}")
                 feeds[feedkey] = aio.create_feed(Feed(name=feedkey), group_key=self._group)
               try:
                 aio.send(feeds[feedkey].key, data[k])
                 last_update[name] = data['timestamp']
-                logging.debug(f"  Sent '{data[k]}' to {feeds[feedkey].key}")
+                logger.debug(f"  Sent '{data[k]}' to {feeds[feedkey].key}")
               except errors.RequestError:
-                logging.info("  Failed to send {feedkey} data (request error)")
+                logger.error("  Failed to send {feedkey} data (request error)")
                 time.sleep(5)
                 continue
               except requests.exceptions.ConnectionError:
-                logging.info("  Failed to send {feedkey} data (connection error)")
+                logger.error("  Failed to send {feedkey} data (connection error)")
                 time.sleep(5)
                 continue
               except requests.exceptions.ReadTimeout:
-                logging.info("  Failed to send {feedkey} data (timeout)")
+                logger.error("  Failed to send {feedkey} data (timeout)")
                 time.sleep(5)
                 continue
               except errors.ThrottlingError:
-                logging.info("  Got throttled sending {feedkey} data; wait 30 seconds")
+                logger.error("  Got throttled sending {feedkey} data; wait 30 seconds")
                 time.sleep(30)
                 continue
           else:
-            logging.debug(f"Dropping data [delta: {delta}]: {data} (Queue-{i} size: {q.qsize()})")
+            logger.debug(f"Dropping data [delta: {delta}]: {data} (Queue-{i} size: {q.qsize()})")
         else:
-          logging.debug(f"Queue-{i} is empty")
+          logger.debug(f"Queue-{i} is empty")
       time.sleep(1)
         
 if __name__ == "__main__":
@@ -98,7 +99,7 @@ if __name__ == "__main__":
   import threading
   import random
 
-  logging.basicConfig(level=logging.DEBUG)
+  logger.basicConfig(level=logging.DEBUG)
 
   io = IOAdafruit('myusername', 'aio_mysecretkeyforaioaccess')
 

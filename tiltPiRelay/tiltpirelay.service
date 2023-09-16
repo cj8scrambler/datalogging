@@ -1,0 +1,16 @@
+[Unit]
+Description=Tilt Pi Relay
+After=network.target bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+Group=bluetooth
+ExecStartPre=+/home/pi/upmerge_datalog/datalogging/tiltPiRelay/./w1-setup.sh load
+ExecStart=/home/pi/upmerge_datalog/datalogging/tiltPiRelay/tiltpirelay.sh
+ExecStopPost=+/home/pi/upmerge_datalog/datalogging/tiltPiRelay/./w1-setup.sh unload
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+

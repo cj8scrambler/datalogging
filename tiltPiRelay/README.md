@@ -51,14 +51,23 @@ CFLAGS="-fcommon"  pip3 install RPi.GPIO
 ```
 
 ### BLE Support
-To receive Tilt hydrometer data, you'll need a BLE capable bluetooth controller.  The Tilt hydrometer sends data in repeated BLE advertisements.  However the Linux kernel and BlueZ stack filter out duplicate BLE advertisements.  As of January 2023, this is [changing](https://github.com/hbldh/bleak/issues/1065#issuecomment-1268947370), but for now, hcidump is used to avoid the problem.  This requires [special configuration](https://github.com/adafruit/Adafruit_Blinka_bleio#support-for-duplicate-advertisement-scanning-on-linux) so that a regular user can run hcidump.
+To receive Tilt hydrometer data, you'll need a BLE capable bluetooth controller.  The Tilt hydrometer sends data in repeated BLE advertisements.  As of September 2024, the bleak packaged should receive these correctly.
+
+On older setups, repeated BLE advertisements would not be reported by bleak.  The workaround was to use hcidump, but this required [special configuration](https://github.com/adafruit/Adafruit_Blinka_bleio#support-for-duplicate-advertisement-scanning-on-linux) so that a regular user can run hcidump.  If you don't see any Tilt data coming in, make sure your user has permissions to run hcidump.
 
 ### Load w1 busses
-The 5 W1 busses need to be started in order so that the script knows which bus is which temp sensor:
+The 5 W1 busses need to be started in order so that the script knows which bus is which temp sensor.  This can be done with `w1-setup.sh load` or manuall done with:
 ```
-sudo dtoverlay w1-gpio gpiopin=17 pullup=0
-sudo dtoverlay w1-gpio gpiopin=27 pullup=0
-sudo dtoverlay w1-gpio gpiopin=23 pullup=0
-sudo dtoverlay w1-gpio gpiopin=24 pullup=0
-sudo dtoverlay w1-gpio gpiopin=4 pullup=0
+sudo dtoverlay w1-gpio gpiopin=23 pullup=0  # CTRL-1  (top left)
+sudo dtoverlay w1-gpio gpiopin=27 pullup=0  # CTRL-2  (top right)
+sudo dtoverlay w1-gpio gpiopin=17 pullup=0  # AMBIENT (top middle)
+sudo dtoverlay w1-gpio gpiopin=24 pullup=0  # GLYCOL  (bottom middle)
+sudo dtoverlay w1-gpio gpiopin=25 pullup=0  # ONBOARD
+```
+
+### Start at boot
+A simple systemd service is defined to auto-start at boot.  Install it with:
+```
+sudo cp tiltpirelay.service /usr/lib/systemd/system/
+sudo systemctl enable tiltpirelay
 ```

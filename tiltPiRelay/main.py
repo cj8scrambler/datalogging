@@ -5,6 +5,8 @@ import time
 import signal
 import queue
 import logging
+import logging.config
+import logging.handlers
 import threading
 import configparser
 sys.path.append('/usr/lib/python3/dist-packages')
@@ -20,29 +22,8 @@ from system import System
 from tilt import TiltScanner
 from adafruit import IOAdafruit
 
-# Time between passes on event loop
-EVENT_LOOP_WAIT_MS = 20
-
-SCAN_INTERVAL = 15
-
-# Hardware Configuration
-HEAT1_GPIO       = 4
-COOL1_GPIO       = 22
-HEAT2_GPIO       = 6
-COOL2_GPIO       = 26
-
-CTLR_1_TEMP_BUS  = "w1_bus_master1"
-CTLR_2_TEMP_BUS  = "w1_bus_master2"
-GLYCOL_TEMP_BUS  = "w1_bus_master4"
-AMBIENT_TEMP_BUS = "w1_bus_master3"
-ONBOARD_TEMP_BUS = "w1_bus_master5"
-
-DISP1_ADDR       = 0x26
-ROT1_ADDR        = 0x37
-DISP2_ADDR       = 0x27
-ROT2_ADDR        = 0x36
-
-DISP_SYS_ADDR    = 0x25
+# Time between passes on main event loop
+MAIN_LOOP_WAIT_MS = 250
 
 UPDATE_RATE_MS   = 5000
 
@@ -53,25 +34,18 @@ TILTCOLORS = [ 'NONE', 'RED', 'GREEN', 'BLACK', 'PURPLE', \
                'ORANGE', 'BLUE', 'YELLOW', 'PINK' ]
 
 """
-Following is added to /boot/config.txt to determine
-OWB bus numbering for temp sensors:
-
-  # w1_bus_master1 [GPIO-17]: Controller-1
-  dtoverlay=w1-gpio,gpiopin=17,pullup=0
-
-  # w1_bus_master2 [GPIO-27]: Controller-2
-  dtoverlay=w1-gpio,gpiopin=27,pullup=0
-
-  # w1_bus_master3 [GPIO-23]: Glycol
-  dtoverlay=w1-gpio,gpiopin=23,pullup=0
-
-  # w1_bus_master4 [GPIO-24]: Ambient
-  dtoverlay=w1-gpio,gpiopin=24,pullup=0
-
-  # w1_bus_master5 [GPIO-4]:  On-board
-  dtoverlay=w1-gpio,gpiopin=25,pullup=0
-
+The w1 busses need to be added in order:
+  sudo dtoverlay w1-gpio gpiopin=23 pullup=0  # CTRL-1  (top left)
+  sudo dtoverlay w1-gpio gpiopin=27 pullup=0  # CTRL-2  (top right)
+  sudo dtoverlay w1-gpio gpiopin=17 pullup=0  # AMBIENT (top middle)
+  sudo dtoverlay w1-gpio gpiopin=24 pullup=0  # GLYCOL  (bottom middle)
+  sudo dtoverlay w1-gpio gpiopin=25 pullup=0   # ONBOARD
 """
+CTLR_1_TEMP_BUS  = "w1_bus_master1"
+CTLR_2_TEMP_BUS  = "w1_bus_master2"
+AMBIENT_TEMP_BUS = "w1_bus_master3"
+GLYCOL_TEMP_BUS  = "w1_bus_master4"
+ONBOARD_TEMP_BUS = "w1_bus_master5"
 
 """
 2 channel temp controller.
@@ -80,15 +54,15 @@ Hardware Setup
   Pinout
   ------
   GPIO 2/3 (I2C) (displays, rotarys, LEDs)
-  GPIO  4: Heat 1
-  GPIO 22: Cool 1
-  GPIO  6: Heat 2
-  GPIO 26: Cool 2
-  GPIO 17: Temp 1 (OWB)
-  GPIO 27: Temp 2 (OWB)
-  GPIO 23: Glycol (OWB)
-  GPIO 24: Ambient (OWB)
   GPIO  4: On Board (OWB)
+  GPIO 17: Ambient (OWB)
+  GPIO 23: Temp 1 (OWB)
+  GPIO 27: Temp 2 (OWB)
+  GPIO 24: Glycol (OWB)
+
+  GPIO  6: Heat 2
+  GPIO 22: Cool 1
+  GPIO 26: Cool 2
 
 3 I2C LCDs:
   1: Control 1
@@ -99,8 +73,18 @@ For each Control channel (2):
   1 I2C 2x16 LCD
   1 Rotary encoder
   1 RGB LED (on rotary encoder board)
-
 """
+
+HEAT1_GPIO       = 4
+COOL1_GPIO       = 22
+HEAT2_GPIO       = 6
+COOL2_GPIO       = 26
+
+DISP1_ADDR       = 0x26
+ROT1_ADDR        = 0x37
+DISP2_ADDR       = 0x27
+ROT2_ADDR        = 0x36
+DISP_SYS_ADDR    = 0x25
 
 # Globals
 run = True
@@ -122,7 +106,7 @@ sysinfo_thread = None
 
 def signal_handler(sig, frame):
   global run, thread1, thread2, tilt, tilt_thread, aio, adafruit_thread, c1, c2, sysinfo, sysinfo_thread
-  logging.debug("Cleaning up");
+  logger.warning("Shutting Down")
   run = False
   if c1:
     c1.end()
@@ -135,29 +119,31 @@ def signal_handler(sig, frame):
   if aio:
     aio.end()
   if thread1:
-    logging.debug("join thread 1")
     thread1.join()
+    logger.debug("thread 1 done")
   if thread2:
-    logging.debug("join thread 2")
     thread2.join()
+    logger.debug("thread 2 done")
   if sysinfo_thread:
-    logging.debug("join sysinfo thread")
     sysinfo_thread.join()
+    logger.debug("sysinfo thread done")
   if tilt_thread:
-    logging.debug("join tilt thread")
     tilt_thread.join()
+    logger.debug("tilt thread done")
   if adafruit_thread:
-    logging.debug("join adafruit thread")
     adafruit_thread.join()
-  logging.debug("done")
+    logger.debug("adafruit thread done")
+  logger.debug("done")
 
 def main():
-  global run, thread1, thread2, tilt_thread, aio, adafruit_thread, c1, c2, sysinfo, sysinfo_thread
+  global run, thread1, thread2, tilt_thread, aio, adafruit_thread, c1, c2, sysinfo, sysinfo_thread, tilt
 
   signal.signal(signal.SIGINT, signal_handler)
+  signal.signal(signal.SIGTERM, signal_handler)
 
   config = configparser.ConfigParser()
   config.read(CONFIGFILE)
+  logger.debug("Begin")
 
   # Add default values in case config file was missing/empty
   if 'setpoint' not in config['DEFAULT']:
@@ -169,6 +155,7 @@ def main():
   if 'system' not in config:
     config['system'] = {  'aio_user': UNSET_CREDENTIALS,
                           'aio_key': UNSET_CREDENTIALS,
+                          'interval': 60,
                           'updated': 'True' }
   if 'port1' not in config:
     config['port1'] = {}
@@ -213,7 +200,9 @@ def main():
       (config['system']['aio_user'] == UNSET_CREDENTIALS)):
     print(f"Set AIO username / key in {CONFIGFILE} to upload data")
   else:
-    aio = IOAdafruit(config['system']['aio_user'], config['system']['aio_key'])
+    aio = IOAdafruit(user=config['system']['aio_user'],
+                     key=config['system']['aio_key'],
+                     interval=int(config['system']['interval']))
     aio.add_q(c1.q)
     aio.add_q(c2.q)
     aio.add_q(q1)
@@ -238,19 +227,39 @@ def main():
     if config['system'].getboolean('updated') or \
        config['port1'].getboolean('updated') or \
        config['port2'].getboolean('updated'):
-      logging.debug("Change found, update configfile")
+      logger.debug("Change found, update configfile")
       config['system']['updated'] = 'False'
       config['port1']['updated'] = 'False'
       config['port2']['updated'] = 'False'
       with open(CONFIGFILE, 'w') as configfile:
         config.write(configfile)
 
-    while (time.time() - last_time) < (EVENT_LOOP_WAIT_MS / 1000.0):
+    while (time.time() - last_time) < (MAIN_LOOP_WAIT_MS / 1000.0):
       sleep(0.005)
 
 if __name__ == "__main__":
-  logging.basicConfig(
-    format='%(asctime)s %(pathname)s:%(lineno)d %(levelname)-8s %(message)s',
-    level=logging.DEBUG,
-    datefmt='%Y-%m-%d %H:%M:%S')
+  logger = logging.getLogger('tiltpirelay')
+
+  LOG_FILENAME = 'debug.log'
+  logfile = logging.handlers.RotatingFileHandler(
+              LOG_FILENAME, maxBytes=20971520, backupCount=0)
+  logfile.setLevel(logging.DEBUG)
+
+  console = logging.StreamHandler()
+  console.setLevel(logging.INFO)
+
+  formatter = logging.Formatter('%(asctime)s - %(name)s:%(lineno)d %(levelname)s - %(message)s')
+  logfile.setFormatter(formatter)
+  console.setFormatter(formatter)
+
+  logger.addHandler(logfile)
+  logger.addHandler(console)
+
+  logger.setLevel(logging.DEBUG)
+  logging.getLogger("tiltpirelay.controller").setLevel(logging.DEBUG)
+  logging.getLogger("tiltpirelay.system").setLevel(logging.INFO)
+  logging.getLogger("tiltpirelay.temp").setLevel(logging.DEBUG)
+  logging.getLogger("tiltpirelay.tilt").setLevel(logging.INFO)
+  logging.getLogger("tiltpirelay.adafruit").setLevel(logging.DEBUG)
+
   main()

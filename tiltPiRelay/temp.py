@@ -16,6 +16,7 @@ a single temp sensor on the bus.
 
 """
 
+logger = logging.getLogger('tiltpirelay.temp')
 INTERVALS_MEDIAN_SIZE = 5
 
 class Temp:
@@ -50,14 +51,14 @@ class Temp:
       try:
         self._file = glob('/sys/bus/w1/devices/' + self._bus + '/28-*/temperature')[0]
       except IndexError as e:
-        logging.warning("No temp sensor found on bus {}".format(self._bus))
+        logger.warning("No temp sensor found on bus {}".format(self._bus))
         self._last_temp  = None
         return
 
     try:
       f = open(self._file, 'r')
     except OSError as e:
-      logging.warning("Temp sensor removed on bus {}".format(self._bus))
+      logger.warning("Temp sensor removed on bus {}".format(self._bus))
       self._file = None
       self._last_temp  = None
       return
@@ -68,12 +69,14 @@ class Temp:
     # value is in thousandths of degrees C; convert to decimal F
     if (len(lines)):
       self._last_temp = (float(lines[-1]) * 9/5000) + 32.0
-      logging.debug("Read temp on {}: {} F".format(self._bus, self._last_temp))
 
       if q:
+        logger.debug("Read temp on {}: {} F -> queue: {}".format(self._bus, self._last_temp, q))
         q.put({'timestamp': datetime.now(timezone.utc).timestamp(),
                'name': self._name,
                'temp': self._last_temp})
+      else:
+        logger.debug("Read temp on {}: {} F (no queue)".format(self._bus, self._last_temp))
       return self._last_temp
     return None
 

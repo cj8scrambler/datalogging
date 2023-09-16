@@ -27,6 +27,8 @@ System display class
 
 """
 
+logger = logging.getLogger('tiltpirelay.system')
+
 class System:
   
   def __init__(self, display_addr, ambient_tempdev, glycol_tempdev):
@@ -38,13 +40,17 @@ class System:
     try:
       self._lcd = LCD(address=display_addr, bus=1, width=16, rows=2)
     except OSError as e:
-      logging.warning("LCD [0x{:x}] not available".format(display_addr))
+      logger.warning("LCD [0x{:x}] not available".format(display_addr))
       self._lcd = None
 
   def system_thread(self):
     while self._run:
       self.update_display()
       time.sleep(1.00)
+
+    if self._lcd:
+      self._lcd.text("SYSTEM", 1, align='center')
+      self._lcd.text("OFF", 2, align='center')
 
   def update_display(self):
     lines = ['']*2
@@ -61,8 +67,8 @@ class System:
       t_string = "{:.1f}".format(t)
     lines[1] = "{:12s}{:>4s}".format('Glycol:', t_string)
 
-    logging.debug("Display Update (sys): {:16s}".format(lines[0]))
-    logging.debug("Display Update (sys): {:16s}".format(lines[1]))
+    logger.debug("Display Update (sys): {:16s}".format(lines[0]))
+    logger.debug("Display Update (sys): {:16s}".format(lines[1]))
 
     if self._lcd:
       self._lcd.text(lines[0], 1)
@@ -70,5 +76,3 @@ class System:
 
   def end(self):
     self._run = False
-    self._lcd.text("", 1)
-    self._lcd.text("", 2)

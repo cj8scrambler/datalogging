@@ -1,5 +1,5 @@
-adafruit-circuitpython-seesaw>=1.11.7
-adafruit-circuitpython-ble>=9.0.1
+adafruit-circuitpython-seesaw>=1.15.0
+adafruit-circuitpython-ble>=10.0.3
 adafruit-io>=2.7.0
 rpi-lcd>=0.0.3
 RPi.GPIO>=0.7.1

@@ -53,6 +53,7 @@ Software controller states:
     WIND: set window (0.0 - 5.0)
 """
 
+logger = logging.getLogger('tiltpirelay.controller')
 
 RED = (255, 0, 0)
 YELLOW = (255, 150, 0)
@@ -107,8 +108,9 @@ class Controller:
 
     try:
       self._lcd = LCD(address=display_addr, bus=1, width=16, rows=2)
+      self._lcd.backlight(True)
     except OSError as e:
-      logging.warning("LCD [0x{:x}] not available".format(display_addr))
+      logger.warning("LCD [0x{:x}] not available".format(display_addr))
       self._lcd = None
 
     try:
@@ -122,7 +124,7 @@ class Controller:
       self._pixel.brightness = 0.1
       self._pixel.fill(YELLOW)
     except ValueError as e:
-      logging.warning("Rotary/LED [0x{}] not available".format(display_addr))
+      logger.warning("Rotary/LED [0x{}] not available".format(display_addr))
       self._button = None
       self._last_but = False
       self._rot = None
@@ -226,10 +228,10 @@ class Controller:
       lines[1] = "  {:.1f} F".format(float(self._config['window']))
 
     else:
-      logging.error("Display update unknown state: {}".format(self._state))
+      logger.error("Display update unknown state: {}".format(self._state))
 
-    logging.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[0]))
-    logging.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[1]))
+    logger.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[0]))
+    logger.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[1]))
     if self._lcd:
       self._lcd.text(lines[0], 1)
       self._lcd.text(lines[1], 2)
@@ -253,7 +255,7 @@ class Controller:
         try:
             but = not self._button.value
         except OSError as e:
-            logging.error("Button read failure: {}".format(e))
+            logger.error("Button read failure: {}".format(e))
             continue
       else:
         but = self._last_but
@@ -262,7 +264,7 @@ class Controller:
         try:
             pos = -self._rot.position #negative makes CW go up
         except OSError as e:
-            logging.error("Rotary read failure: {}".format(e))
+            logger.error("Rotary read failure: {}".format(e))
             continue
       else:
         pos = self._last_pos
@@ -270,26 +272,26 @@ class Controller:
       # Handle button press
       if not self._last_but and but:
         self._state = (self._state + 1) % len(STATES)
-        logging.debug("Button press; new state: {}".format(STATES[self._state]))
+        logger.debug("Button press; new state: {}".format(STATES[self._state]))
         uichange = True
 
       # Handle rotation
       # TODO: maybe add some acceleration scaling
       elif self._last_pos != pos:
-        logging.debug("Rotation: {}".format(pos - self._last_pos))
+        logger.debug("Rotation: {}".format(pos - self._last_pos))
         if STATES[self._state] == 'SET':
           self._config['setpoint'] = str(float(self._config['setpoint']) + \
                                          (pos - self._last_pos) / 10.0)
           self._config['updated'] = 'True'
           uichange = True
-          logging.info("New setpoint: {}".format(self._config['setpoint']))
+          logger.info("New setpoint: {}".format(self._config['setpoint']))
         elif STATES[self._state] == 'TILT':
           new_i = (TILTCOLORS.index(self._config['tiltcolor']) + \
                    (pos - self._last_pos)) % len(TILTCOLORS)
           self._config['tiltcolor'] = TILTCOLORS[new_i]
           self._config['updated'] = 'True'
           uichange = True
-          logging.info("New Tilt Color: {}".format(self._config['tiltcolor']))
+          logger.info("New Tilt Color: {}".format(self._config['tiltcolor']))
         elif STATES[self._state] == 'WIND':
           new_w = float(self._config['window']) + (pos - self._last_pos)/10.0
           new_w = max(WINMIN, min(WINMAX, new_w))
@@ -297,7 +299,7 @@ class Controller:
             self._config['window'] = str(new_w)
             self._config['updated'] = 'True'
             uichange = True
-            logging.info("New Window: {}".format(self._config['window']))
+            logger.info("New Window: {}".format(self._config['window']))
   
       # UI change resets idle timeout
       if uichange:
@@ -307,11 +309,8 @@ class Controller:
       # Check for temp change in IDLE
       if (self._state == STATES.index('IDLE')) and \
          (self._last_disp_temp != self._temp.last()):
-        logging.debug("Temp Change (ctrl-{}): {} -> {}".format(self._temp._bus, self._last_disp_temp, self._temp.last()))
+        logger.debug("Temp Change (ctrl-{}): {} -> {}".format(self._temp._bus, self._last_disp_temp, self._temp.last()))
         display_update = True
-
-      if display_update:
-        self.update_display()
 
       self._last_but = but
       self._last_pos = pos
@@ -329,12 +328,20 @@ class Controller:
 
         # Check for idle timeout
         if self.is_idle() and self._state != STATES.index('IDLE'):
-          logging.debug("Idle timeout")
+          logger.debug("Idle timeout")
           self._state = STATES.index('IDLE')
           display_update = True
 
+        if display_update:
+          self.update_display()
+
       while (time.time() - begin_time) < (EVENT_LOOP_WAIT_MS / 1000.0):
         time.sleep(0.01)
+
+    if self._lcd:
+      self._lcd.text("SYSTEM", 1, align='center')
+      self._lcd.text("OFF", 2, align='center')
+      self._lcd.backlight(False)
 
   def end(self):
     self._run = False
