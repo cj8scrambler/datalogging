@@ -139,6 +139,8 @@ class Controller:
       self._mode = MODES.index('INVALID')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 0)
+      logger.info(f"{self._name}  mode: INVALID;  HEAT gpio-{self._heat_gpio} off; " + \
+                  f"COOL gpio-{self._cool_gpio} off")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
@@ -152,6 +154,8 @@ class Controller:
       self._mode = MODES.index('COOL')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 1)
+      logger.info(f"{self._name}  mode: COOL;  HEAT gpio-{self._heat_gpio} off; " + \
+                  f"COOL gpio-{self._cool_gpio} on")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
@@ -165,6 +169,8 @@ class Controller:
       self._mode = MODES.index('HEAT')
       GPIO.output(self._cool_gpio, 0)
       GPIO.output(self._heat_gpio, 1)
+      logger.info(f"{self._name}  mode: HEAD;  HEAT gpio-{self._heat_gpio} on; " + \
+                  f"COOL gpio-{self._cool_gpio} off")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
@@ -177,6 +183,8 @@ class Controller:
       self._mode = MODES.index('OFF')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 0)
+      logger.info(f"{self._name}  mode: OFF;  HEAT gpio-{self._heat_gpio} off; " + \
+                  f"COOL gpio-{self._cool_gpio} off")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
@@ -346,13 +354,15 @@ class Controller:
       if display_update:
         self.update_display()
 
+    # Shutdown cleanup
+    GPIO.output(self._heat_gpio, 0)
+    GPIO.output(self._cool_gpio, 0)
+    self._pixel.fill(YELLOW)
+    logger.info(f"{self._name}  Shutdown: HEAT gpio-{self._heat_gpio} off; " + \
+                f"COOL gpio-{self._cool_gpio} off")
     if self._lcd:
       self._lcd.text("SYSTEM", 1, align='center')
       self._lcd.text("OFF", 2, align='center')
-      self._lcd.backlight(False)
 
   def end(self):
     self._run = False
-    self._pixel.fill(BLACK)
-    self._lcd.text("", 1)
-    self._lcd.text("", 2)

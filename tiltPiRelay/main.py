@@ -61,6 +61,7 @@ Hardware Setup
   GPIO 27: Temp 2 (OWB)
   GPIO 24: Glycol (OWB)
 
+  GPIO  4: Heat 1
   GPIO  6: Heat 2
   GPIO 22: Cool 1
   GPIO 26: Cool 2
@@ -258,7 +259,7 @@ if __name__ == "__main__":
   logger.addHandler(console)
 
   logger.setLevel(logging.DEBUG)
-  logging.getLogger("tiltpirelay.controller").setLevel(logging.INFO)
+  logging.getLogger("tiltpirelay.controller").setLevel(logging.DEBUG)
   logging.getLogger("tiltpirelay.system").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.temp").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.tilt").setLevel(logging.INFO)

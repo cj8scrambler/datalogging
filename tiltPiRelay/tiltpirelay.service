@@ -6,10 +6,14 @@ After=network.target bluetooth.target
 Type=simple
 User=pi
 Group=bluetooth
-ExecStartPre=+/home/pi/upmerge_datalog/datalogging/tiltPiRelay/./w1-setup.sh load
+ExecStartPre=+/home/pi/datalogging/tiltPiRelay/w1-setup.sh load
 ExecStart=/home/pi/upmerge_datalog/datalogging/tiltPiRelay/tiltpirelay.sh
-ExecStopPost=+/home/pi/upmerge_datalog/datalogging/tiltPiRelay/./w1-setup.sh unload
-Restart=on-abort
+ExecStopPost=+/home/pi/datalogging/tiltPiRelay/w1-setup.sh unload
+ExecStopPost=+raspi-gpio set 4 dl
+ExecStopPost=+raspi-gpio set 6 dl
+ExecStopPost=+raspi-gpio set 22 dl
+ExecStopPost=+raspi-gpio set 26 dl
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
