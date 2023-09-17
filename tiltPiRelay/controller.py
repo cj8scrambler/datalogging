@@ -91,7 +91,7 @@ class Controller:
     self._last_disp_temp = None
     self._last_mode_update = 0
     self._run = True;
-    self._ = True;
+    self._display_init = False;
     self.q = SimpleQueue()
 
 
@@ -192,7 +192,7 @@ class Controller:
   def update_display(self):
     lines = ['']*2
 
-    if STATES[self._state] == 'INVALID':
+    if MODES[self._mode] == 'INVALID':
       lines[0] = "ERROR: MISSING"
       lines[1] = "TEMP SENSOR"
 
@@ -232,6 +232,7 @@ class Controller:
 
     logger.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[0]))
     logger.debug("Display Update (ctlr-{}): {:16s}".format(self._temp._bus, lines[1]))
+
     if self._lcd:
       self._lcd.text(lines[0], 1)
       self._lcd.text(lines[1], 2)
@@ -301,6 +302,12 @@ class Controller:
             uichange = True
             logger.info("New Window: {}".format(self._config['window']))
   
+      # return True if display has never been initalized
+      if (not self._display_init):
+        logger.debug("First pass; force display update")
+        self._display_init = True
+        display_update = True
+
       # UI change resets idle timeout
       if uichange:
         self._goidle = time.time() + IDLE_TIMEOUT
@@ -332,11 +339,12 @@ class Controller:
           self._state = STATES.index('IDLE')
           display_update = True
 
-        if display_update:
-          self.update_display()
 
       while (time.time() - begin_time) < (EVENT_LOOP_WAIT_MS / 1000.0):
         time.sleep(0.01)
+
+      if display_update:
+        self.update_display()
 
     if self._lcd:
       self._lcd.text("SYSTEM", 1, align='center')

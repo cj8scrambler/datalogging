@@ -44,6 +44,7 @@ class System:
       self._lcd = None
 
   def system_thread(self):
+    logger.debug("Begin system thread");
     while self._run:
       self.update_display()
       time.sleep(1.00)
@@ -59,13 +60,17 @@ class System:
     t=self._ambient.last()
     if (t):
       t_string = "{:.1f}".format(t)
-    lines[0] = "{:12s}{:>4s}".format('Ambient:', t_string)
+      lines[0] = "{:12s}{:>4s}".format('Ambient:', t_string)
+    else:
+      lines[0] = "Ambient: Missing"
 
     t_string=""
     t=self._glycol.last()
     if (t):
       t_string = "{:.1f}".format(t)
-    lines[1] = "{:12s}{:>4s}".format('Glycol:', t_string)
+      lines[1] = "{:12s}{:>4s}".format('Glycol:', t_string)
+    else:
+      lines[1] = "Glycol: Missing"
 
     logger.debug("Display Update (sys): {:16s}".format(lines[0]))
     logger.debug("Display Update (sys): {:16s}".format(lines[1]))

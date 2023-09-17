@@ -41,8 +41,9 @@ The w1 busses need to be added in order:
   sudo dtoverlay w1-gpio gpiopin=24 pullup=0  # GLYCOL  (bottom middle)
   sudo dtoverlay w1-gpio gpiopin=25 pullup=0   # ONBOARD
 """
-CTLR_1_TEMP_BUS  = "w1_bus_master1"
-CTLR_2_TEMP_BUS  = "w1_bus_master2"
+#I swapped 1 & 2
+CTLR_2_TEMP_BUS  = "w1_bus_master1"
+CTLR_1_TEMP_BUS  = "w1_bus_master2"
 AMBIENT_TEMP_BUS = "w1_bus_master3"
 GLYCOL_TEMP_BUS  = "w1_bus_master4"
 ONBOARD_TEMP_BUS = "w1_bus_master5"
@@ -215,6 +216,7 @@ def main():
     adafruit_thread = threading.Thread(target=aio.control_thread, daemon=True)
     adafruit_thread.start()
 
+  logger.debug("Staring main loop")
   while run:
     last_time = time.time()
 
@@ -256,9 +258,9 @@ if __name__ == "__main__":
   logger.addHandler(console)
 
   logger.setLevel(logging.DEBUG)
-  logging.getLogger("tiltpirelay.controller").setLevel(logging.DEBUG)
+  logging.getLogger("tiltpirelay.controller").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.system").setLevel(logging.INFO)
-  logging.getLogger("tiltpirelay.temp").setLevel(logging.DEBUG)
+  logging.getLogger("tiltpirelay.temp").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.tilt").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.adafruit").setLevel(logging.DEBUG)
 
