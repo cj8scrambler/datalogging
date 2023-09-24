@@ -76,6 +76,13 @@ IDLE_TIMEOUT = 4
 #TOGGLE_TIME  = 2
 EVENT_LOOP_WAIT_MS = 100
 
+# Control On/Off reported value
+# io.adafruit can't do dual Y axis plot so the on/off values
+# for the controller need to be scaled closer to the expected
+# temperature range to keep the graph readable.
+CONTROL_ON_VALUE = 80
+CONTROL_OFF_VALUE = 60
+
 class Controller:
   
   def __init__(self, name, config, heat_gpio, cool_gpio, \
@@ -139,14 +146,14 @@ class Controller:
       self._mode = MODES.index('INVALID')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 0)
-      logger.info(f"{self._name}  mode: INVALID;  HEAT gpio-{self._heat_gpio} off; " + \
-                  f"COOL gpio-{self._cool_gpio} off")
+      logger.debug(f"{self._name}  mode: INVALID;  HEAT gpio-{self._heat_gpio} off; " + \
+                   f"COOL gpio-{self._cool_gpio} off")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
                   'window': float(self._config['window']),
-                  'heat': 0,
-                  'cool': 0})
+                  'heat': CONTROL_OFF_VALUE,
+                  'cool': CONTROL_OFF_VALUE})
       if self._pixel:
           self._pixel.fill(YELLOW)
     elif self._temp.last() > (float(self._config['setpoint']) + \
@@ -154,14 +161,14 @@ class Controller:
       self._mode = MODES.index('COOL')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 1)
-      logger.info(f"{self._name}  mode: COOL;  HEAT gpio-{self._heat_gpio} off; " + \
-                  f"COOL gpio-{self._cool_gpio} on")
+      logger.debug(f"{self._name}  mode: COOL;  HEAT gpio-{self._heat_gpio} off; " + \
+                   f"COOL gpio-{self._cool_gpio} on")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
                   'window': float(self._config['window']),
-                  'heat': 0,
-                  'cool': 100})
+                  'heat': CONTROL_OFF_VALUE,
+                  'cool': CONTROL_ON_VALUE})
       if self._pixel:
           self._pixel.fill(BLUE)
     elif self._temp.last() < (float(self._config['setpoint']) - \
@@ -169,28 +176,28 @@ class Controller:
       self._mode = MODES.index('HEAT')
       GPIO.output(self._cool_gpio, 0)
       GPIO.output(self._heat_gpio, 1)
-      logger.info(f"{self._name}  mode: HEAD;  HEAT gpio-{self._heat_gpio} on; " + \
-                  f"COOL gpio-{self._cool_gpio} off")
+      logger.debug(f"{self._name}  mode: HEAT;  HEAT gpio-{self._heat_gpio} on; " + \
+                   f"COOL gpio-{self._cool_gpio} off")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
                   'window': float(self._config['window']),
-                  'heat': 100,
-                  'cool': 0})
+                  'heat': CONTROL_ON_VALUE,
+                  'cool': CONTROL_OFF_VALUE})
       if self._pixel:
           self._pixel.fill(RED)
     else:
       self._mode = MODES.index('OFF')
       GPIO.output(self._heat_gpio, 0)
       GPIO.output(self._cool_gpio, 0)
-      logger.info(f"{self._name}  mode: OFF;  HEAT gpio-{self._heat_gpio} off; " + \
-                  f"COOL gpio-{self._cool_gpio} off")
+      logger.debug(f"{self._name}  mode: OFF;  HEAT gpio-{self._heat_gpio} off; " + \
+                   f"COOL gpio-{self._cool_gpio} off")
       self.q.put({'timestamp': datetime.now(timezone.utc).timestamp(), \
                   'name': f"{self._name}",               \
                   'setpoint': float(self._config['setpoint']),
                   'window': float(self._config['window']),
-                  'heat': 0,
-                  'cool': 0})
+                  'heat': CONTROL_OFF_VALUE,
+                  'cool': CONTROL_OFF_VALUE})
       if self._pixel:
           self._pixel.fill(BLACK)
 

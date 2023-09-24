@@ -245,7 +245,7 @@ if __name__ == "__main__":
 
   LOG_FILENAME = 'debug.log'
   logfile = logging.handlers.RotatingFileHandler(
-              LOG_FILENAME, maxBytes=20971520, backupCount=0)
+              LOG_FILENAME, maxBytes=5242880, backupCount=3)
   logfile.setLevel(logging.DEBUG)
 
   console = logging.StreamHandler()
@@ -263,6 +263,6 @@ if __name__ == "__main__":
   logging.getLogger("tiltpirelay.system").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.temp").setLevel(logging.INFO)
   logging.getLogger("tiltpirelay.tilt").setLevel(logging.INFO)
-  logging.getLogger("tiltpirelay.adafruit").setLevel(logging.DEBUG)
+  logging.getLogger("tiltpirelay.adafruit").setLevel(logging.INFO)
 
   main()
